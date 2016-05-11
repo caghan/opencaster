@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <net/if.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -71,8 +72,10 @@ int main (int argc, char *argv[]) {
     unsigned char option_ttl;
     char start_addr[4];
     struct sockaddr_in addr;
+    struct ifreq ifr;
     unsigned long int packet_size;   
     char* tsfile;
+    char* interface;
     unsigned char* send_buf;
     unsigned int bitrate;
     unsigned long long int packet_time;
@@ -82,18 +85,20 @@ int main (int argc, char *argv[]) {
     struct timespec nano_sleep_packet;
     
     memset(&addr, 0, sizeof(addr));
+    memset(&ifr, 0, sizeof(ifr));
     memset(&time_start, 0, sizeof(time_start));
     memset(&time_stop, 0, sizeof(time_stop));
     memset(&nano_sleep_packet, 0, sizeof(nano_sleep_packet));
 
-    if(argc < 5 ) {
-	fprintf(stderr, "Usage: %s file.ts ipaddr port bitrate [ts_packet_per_ip_packet] [udp_packet_ttl]\n", argv[0]);
+    if(argc < 6 ) {
+	fprintf(stderr, "Usage: %s file.ts ipaddr port bitrate interface [ts_packet_per_ip_packet] [udp_packet_ttl]\n", argv[0]);
 	fprintf(stderr, "ts_packet_per_ip_packet default is 7\n");
 	fprintf(stderr, "bit rate refers to transport stream bit rate\n");
 	fprintf(stderr, "zero bitrate is 100.000.000 bps\n");
 	return 0;
     } else {
 	tsfile = argv[1];
+	interface = argv[5];
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr(argv[2]);
 	addr.sin_port = htons(atoi(argv[3]));
@@ -101,8 +106,8 @@ int main (int argc, char *argv[]) {
 	if (bitrate <= 0) {
 	    bitrate = 100000000;
 	}
-	if (argc >= 6) {
-	    packet_size = strtoul(argv[5], 0, 0) * TS_PACKET_SIZE;
+	if (argc >= 7) {
+	    packet_size = strtoul(argv[6], 0, 0) * TS_PACKET_SIZE;
 	} else {
 	    packet_size = 7 * TS_PACKET_SIZE;
 	}
@@ -113,9 +118,17 @@ int main (int argc, char *argv[]) {
 	perror("socket(): error ");
 	return 0;
     } 
-    
-    if (argc >= 7)  {
-	option_ttl = atoi(argv[6]);
+   
+    // bind a socket to a device name (might not work on all systems):
+    snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", interface);
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE,
+        (void *)&ifr, sizeof(ifr)) < 0) {
+        fprintf(stderr, "Error at setsockopt, ensure it is running as root.\n");
+        exit(1);
+    }
+
+    if (argc >= 8)  {
+	option_ttl = atoi(argv[7]);
 	is_multicast = 0;
 	memcpy(start_addr, argv[2], 3);
 	start_addr[3] = 0;
