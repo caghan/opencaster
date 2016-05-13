@@ -133,7 +133,7 @@ int main (int argc, char *argv[]) {
 	memcpy(start_addr, argv[2], 3);
 	start_addr[3] = 0;
 	is_multicast = atoi(start_addr);
-	is_multicast = (is_multicast >= 224) || (is_multicast <= 239);
+	is_multicast = (is_multicast >= 224) && (is_multicast <= 239);
 	if (is_multicast) {
 	    ret = setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_TTL, &option_ttl, sizeof(option_ttl));
 	} else {
